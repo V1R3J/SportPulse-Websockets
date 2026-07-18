@@ -1,9 +1,9 @@
-import 'dotenv/config';
-import {drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
+import "dotenv/config";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not defined in the environment variables');
+  throw new Error("DATABASE_URL is not defined in the environment variables");
 }
 
 export const pool = new pg.Pool({

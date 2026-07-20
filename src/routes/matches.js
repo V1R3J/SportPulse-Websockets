@@ -6,7 +6,7 @@ import {
 } from "../validation/matches.js";
 import { matches } from "../db/schema.js";
 import { db } from "../db/db.js";
-import { getMatchStatus, syncMatchStatus } from "../utils/match-status.js";
+import { getMatchStatus } from "../utils/match-status.js";
 
 export const matchRouter = Router();
 const MAX_LIMIT = 100; // maximum limit for pagination
@@ -66,6 +66,11 @@ matchRouter.post("/", async (req, res) => {
         status: getMatchStatus(startTime, endTime),
       })
       .returning();
+
+    // Sync the match status to any connected WebSocket clients
+    if (res.app.locals.broadcastMatchCreated) {
+      res.app.locals.broadcastMatchCreated(event);
+    }
 
     res.status(201).json({ data: event });
   } catch (error) {

@@ -1,25 +1,26 @@
 import { z } from "zod";
 
 export const MATCH_STATUS = {
-    SCHEDULED: 'scheduled',
-    LIVE: 'live',
-    FINISHED: 'finished',
-}
+  SCHEDULED: "scheduled",
+  LIVE: "live",
+  FINISHED: "finished",
+};
 
 export const listMatchesQuerySchema = z.object({
-    limit: z.coerce.number().int().positive().max(100).optional()
-})
-
-export const matchIdParamSchema = z.object({
-    id: z.coerce.number().int().positive(),
-})
-
-const isoDateString = z.string().datetime({
-    message: "Invalid ISO date string",
-    offset: false, // requires UTC 'Z' suffix, e.g. "2026-07-03T18:30:41.876Z"
+  limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
-export const createMatchSchema = z.object({
+export const matchIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const isoDateString = z.string().datetime({
+  message: "Invalid ISO date string",
+  offset: false, // requires UTC 'Z' suffix, e.g. "2026-07-03T18:30:41.876Z"
+});
+
+export const createMatchSchema = z
+  .object({
     sport: z.string().min(1),
     homeTeam: z.string().min(1),
     awayTeam: z.string().min(1),
@@ -27,19 +28,20 @@ export const createMatchSchema = z.object({
     endTime: isoDateString,
     homeScore: z.number().int().nonnegative().optional(),
     awayScore: z.number().int().nonnegative().optional(),
-}).superRefine((data, ctx) => {
+  })
+  .superRefine((data, ctx) => {
     const start = new Date(data.startTime);
     const end = new Date(data.endTime);
-    if ( end <= start ) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "endTime must be after startTime",
-            path: ["endTime"],
-        });
+    if (end <= start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "endTime must be after startTime",
+        path: ["endTime"],
+      });
     }
-});
+  });
 
 export const updateScoreSchema = z.object({
-    homeScore: z.coerce.number().int().nonnegative(),
-    awayScore: z.coerce.number().int().nonnegative(),
+  homeScore: z.coerce.number().int().nonnegative(),
+  awayScore: z.coerce.number().int().nonnegative(),
 });

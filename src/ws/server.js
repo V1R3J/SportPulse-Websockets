@@ -33,7 +33,10 @@ export function attachWebSocketServer(server) {
 
   server.on("upgrade", async (req, socket, head) => {
     const { pathname } = new URL(req.url, `http://${req.headers.host}`);
-    if (pathname !== "/ws") return; // leave other upgrade paths untouched
+    if (pathname !== "/ws") {
+      socket.destroy();
+      return;
+    }
 
     if (wsArcjet) {
       try {

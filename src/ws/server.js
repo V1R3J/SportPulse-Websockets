@@ -147,6 +147,8 @@ export function attachWebSocketServer(server) {
   return { broadcastMatchCreated, broadcastCommentary };
 }
 
+const MAX_SUBSCRIPTIONS_PER_SOCKET = 100;
+
 function handleMessage(socket, data) {
   let message;
   try {
@@ -156,7 +158,18 @@ function handleMessage(socket, data) {
     return;
   }
 
-  if (message?.type === "subscribe" && Number.isInteger(message.matchId)) {
+  if (
+    message?.type === "subscribe" &&
+    Number.isSafeInteger(message.matchId) &&
+    message.matchId > 0
+  ) {
+    if (
+      !socket.subscriptions.has(message.matchId) &&
+      socket.subscriptions.size >= MAX_SUBSCRIPTIONS_PER_SOCKET
+    ) {
+      sendJson(socket, { type: "error", message: "Subscription limit reached" });
+      return;
+    }
     subscribe(message.matchId, socket);
     socket.subscriptions.add(message.matchId);
     sendJson(socket, { type: "subscribed", matchId: message.matchId });

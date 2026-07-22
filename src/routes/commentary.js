@@ -3,7 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { matchIdParamSchema } from "../validation/matches.js";
 import { createCommentarySchema, listCommentaryQuerySchema } from "../validation/commentary.js";
 import { db } from "../db/db.js";
-import { commentary } from "../db/schema.js";
+import { commentary, matches } from "../db/schema.js";
 
 const MAX_LIMIT = 100;
 
@@ -56,6 +56,17 @@ commentaryRouter.post('/', async (req, res) => {
 
     try {
         const { minute, ...rest } = bodyResult.data;
+
+        const [existingMatch] = await db
+            .select({ id: matches.id })
+            .from(matches)
+            .where(eq(matches.id, paramsResult.data.id))
+            .limit(1);
+
+        if (!existingMatch) {
+            return res.status(404).json({ error: 'Match not found.' });
+        }
+
         const [result] = await db.insert(commentary).values({
             matchId: paramsResult.data.id,
             minute,

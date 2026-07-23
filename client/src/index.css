@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+@import "tailwindcss";
+
+/* Enable the `dark:` variant via a class on <html>, toggled by Header.jsx */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Light mode (default) */
+  --color-stadium: #F4F6F5;
+  --color-stadium-surface: #FFFFFF;
+  --color-stadium-line: #E1E7E3;
+  --color-stadium-text: #10151C;
+  --color-stadium-muted: #5B6672;
+
+  --color-lime-scoreboard: #4C8A18;
+  --color-amber-live: #B4630A;
+
+  --color-sport-football: #4C8A18;
+  --color-sport-basketball: #B4630A;
+  --color-sport-cricket: #0F8A7C;
+  --color-sport-tennis: #B23568;
+
+  --font-display: "Teko", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* Dark mode overrides — same token names, new values */
+.dark {
+  --color-stadium: #0A0E14;
+  --color-stadium-surface: #12181F;
+  --color-stadium-line: #1F2733;
+  --color-stadium-text: #F1F5F9;
+  --color-stadium-muted: #94A3B8;
+
+  --color-lime-scoreboard: #C4F73B;
+  --color-amber-live: #FFB020;
+
+  --color-sport-football: #C4F73B;
+  --color-sport-basketball: #FFB020;
+  --color-sport-cricket: #3ED6C6;
+  --color-sport-tennis: #FF6FA5;
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-stadium);
+  color: var(--color-stadium-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-stadium-line) transparent;
+}
+
+/* Respect reduced-motion preferences for the pulsing live dot / transitions */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

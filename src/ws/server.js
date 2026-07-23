@@ -1,7 +1,26 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { wsArcjet } from "../arcjet.js";
+import { verifyToken } from "@clerk/backend";
+import { eq } from "drizzle-orm";
+import { db } from "../db/db.js";
+import { userSportSubscriptions } from "../db/schema.js";
 
 const matchSubscribers = new Map();
+const sportSubscribers = new Map();
+
+function subscribeSport(sport, socket) {
+  if (!sportSubscribers.has(sport)) sportSubscribers.set(sport, new Set());
+  sportSubscribers.get(sport).add(socket);
+}
+
+function broadcastToSport(sport, payload) {
+  const subscribers = sportSubscribers.get(sport);
+  if (!subscribers || subscribers.size === 0) return;
+  const message = JSON.stringify(payload);
+  for (const client of subscribers) {
+    if (client.readyState === WebSocket.OPEN) client.send(message);
+  }
+}
 
 function subscribe(matchId, socket) {
   if (!matchSubscribers.has(matchId)) {
@@ -23,6 +42,10 @@ function unsubscribe(matchId, socket) {
 function cleanupSubscriptions(socket) {
   for (const matchId of socket.subscriptions) {
     unsubscribe(matchId, socket);
+  }
+  for (const sport of socket.sportSubscriptions) {
+    const subscribers = sportSubscribers.get(sport);
+    if (subscribers) subscribers.delete(socket);
   }
 }
 
@@ -55,11 +78,19 @@ function broadcastToAll(wss, payload) {
 // reject an upgrade request at the HTTP level with a minimal status line
 function rejectUpgrade(socket, code, reason) {
   socket.write(
-    `HTTP/1.1 ${code} ${reason}\r\n` +
-      "Connection: close\r\n" +
-      "\r\n"
+    `HTTP/1.1 ${code} ${reason}\r\n` + "Connection: close\r\n" + "\r\n",
   );
   socket.destroy();
+}
+
+// look up a user's saved sports from Neon via Drizzle
+async function getUserSports(userId) {
+  const rows = await db
+    .select({ sport: userSportSubscriptions.sport })
+    .from(userSportSubscriptions)
+    .where(eq(userSportSubscriptions.userId, userId));
+
+  return rows.map((row) => row.sport);
 }
 
 // function to attach a WebSocket server to an existing HTTP server
@@ -70,7 +101,10 @@ export function attachWebSocketServer(server) {
   });
 
   server.on("upgrade", async (req, socket, head) => {
-    const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+    const { pathname, searchParams } = new URL(
+      req.url,
+      `http://${req.headers.host}`,
+    );
     if (pathname !== "/ws") {
       socket.destroy();
       return;
@@ -93,6 +127,24 @@ export function attachWebSocketServer(server) {
       }
     }
 
+    // Optional Clerk token, passed as ?token=... since raw WS upgrades
+    // don't go through Express's clerkMiddleware(). A missing or invalid
+    // token is treated as an anonymous connection, not rejected outright,
+    // so unauthenticated clients can still use match-based subscribe/unsubscribe.
+    let userId = null;
+    const token = searchParams.get("token");
+    if (token) {
+      try {
+        const result = await verifyToken(token, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+        });
+        userId = result.sub;
+      } catch (error) {
+        console.error("WS token verification failed", error);
+      }
+    }
+    req.userId = userId;
+
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws, req);
     });
@@ -107,9 +159,10 @@ export function attachWebSocketServer(server) {
     });
   }, 30000); // Check every 30 seconds
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", async (socket, req) => {
     socket.isAlive = true;
     socket.subscriptions = new Set();
+    socket.sportSubscriptions = new Set();
 
     socket.on("pong", () => {
       socket.isAlive = true;
@@ -127,6 +180,21 @@ export function attachWebSocketServer(server) {
       cleanupSubscriptions(socket);
     });
 
+    // Auto-subscribe an authenticated socket to every sport the user saved
+    // under /subscriptions, so they get commentary for those sports without
+    // sending explicit subscribe messages per match.
+    if (req.userId) {
+      try {
+        const sports = await getUserSports(req.userId);
+        for (const sport of sports) {
+          subscribeSport(sport, socket);
+          socket.sportSubscriptions.add(sport);
+        }
+      } catch (error) {
+        console.error("Failed to load user sport subscriptions", error);
+      }
+    }
+
     sendJson(socket, {
       type: "welcome",
     });
@@ -140,8 +208,12 @@ export function attachWebSocketServer(server) {
     broadcastToAll(wss, { type: "match_created", data: match });
   }
 
-  function broadcastCommentary(matchId, comment) {
-    broadcastToMatch(matchId, { type: "commentary", data: comment });
+  // sport is optional so existing callers that only pass (matchId, comment)
+  // keep working — they just won't fan out to sport subscribers.
+  function broadcastCommentary(matchId, comment, sport) {
+    const payload = { type: "commentary", data: comment };
+    broadcastToMatch(matchId, payload);
+    if (sport) broadcastToSport(sport, payload);
   }
 
   return { broadcastMatchCreated, broadcastCommentary };
@@ -167,7 +239,10 @@ function handleMessage(socket, data) {
       !socket.subscriptions.has(message.matchId) &&
       socket.subscriptions.size >= MAX_SUBSCRIPTIONS_PER_SOCKET
     ) {
-      sendJson(socket, { type: "error", message: "Subscription limit reached" });
+      sendJson(socket, {
+        type: "error",
+        message: "Subscription limit reached",
+      });
       return;
     }
     subscribe(message.matchId, socket);

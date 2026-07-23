@@ -58,7 +58,7 @@ commentaryRouter.post('/', async (req, res) => {
         const { minute, ...rest } = bodyResult.data;
 
         const [existingMatch] = await db
-            .select({ id: matches.id })
+            .select({ id: matches.id, sport: matches.sport })
             .from(matches)
             .where(eq(matches.id, paramsResult.data.id))
             .limit(1);
@@ -74,7 +74,7 @@ commentaryRouter.post('/', async (req, res) => {
         }).returning();
 
         if(res.app.locals.broadcastCommentary) {
-            res.app.locals.broadcastCommentary(result.matchId, result);
+            res.app.locals.broadcastCommentary(result.matchId, result, existingMatch.sport);
         }
 
         res.status(201).json({ data: result });

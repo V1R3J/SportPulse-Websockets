@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, timestamp, pgEnum, jsonb, primaryKey } from 'drizzle-orm/pg-core';
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished']);
 
@@ -31,3 +31,16 @@ export const commentary = pgTable('commentary', {
   tags: text('tags').array(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+
+export const userSportSubscriptions = pgTable(
+  "user_sport_subscriptions",
+  {
+    userId: text("user_id").notNull(),      // Clerk user ID, e.g. "user_2abc..."
+    sport: text("sport").notNull(),          // "football" | "basketball" | "cricket" | "tennis"
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.sport] }),
+  })
+);
